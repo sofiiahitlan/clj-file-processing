@@ -12,6 +12,11 @@ Assume that all names are identical or not?")
 (def files-to-process ;; hard-code all file names vs access all files in folder?
   ["mock_data_commas.csv" "mock_data_pipelines.csv" "mock_data_whitespace.csv"])
 
+(defn get-files-to-process ;; rename?
+  "Returns and array of file names in a directory."
+  []
+  (mapv str (filter #(.isFile %) (file-seq (clojure.java.io/file "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/")))))
+
 (defn process-file
   "Opens file using with-open to ensure the Reader is properly closed when
   processing is completed."
@@ -60,3 +65,18 @@ Assume that all names are identical or not?")
     (let [output (apply + (process-files (comp (map count))
                                          files-to-process))
           ])))
+
+
+
+;; (file-seq (clojure.java.io/file "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/"))
+
+;; (#object[java.io.File 0x58e52aa1 "/home/sofiia/clj-file-processing/src/clj_file_processing/csv"]
+;;  #object[java.io.File 0x6e8fe4dc "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_whitespace.csv"]
+;;  #object[java.io.File 0x73ad899c "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_pipelines.csv"]
+;;  #object[java.io.File 0x13986ece "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_commas.csv"])
+
+
+;; (mapv str (filter #(.isFile %) (file-seq (clojure.java.io/file "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/"))))
+;; ["/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_whitespace.csv"
+;;  "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_pipelines.csv"
+;;  "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_commas.csv"]
