@@ -6,22 +6,25 @@
   )
 
 (comment "Decide on how to process files. Have the atom and swap the value each
-new file is processed maybe? If no, figure out how to use transducer.")
+new file is processed maybe? If no, figure out how to use transducer.
+Assume that all names are identical or not?")
 
-(def files-to-process
+(def files-to-process ;; hard-code all file names vs access all files in folder?
   ["mock_data_commas.csv" "mock_data_pipelines.csv" "mock_data_whitespace.csv"])
 
 (defn process-file
   "Opens file using with-open to ensure the Reader is properly closed when
   processing is completed."
   [transducer file]
-  (let [user-dir (str (System/getProperty "user.dir") "/csv")
-        file-path (str user-dir file)]
+  (let [user-dir (System/getProperty "user.dir")
+        currernt-dir (str user-dir "/src/clj_file_processing/csv")
+        file-path (str user-dir "/" file)]
     (try
-      (with-open [reader (io/reader file-path)]
-        (into []
-              transducer
-              (line-seq reader)))
+      (let [content (with-open [reader (io/reader file-path)]
+                      (str/join "\n" (line-seq reader))
+                      #_(into []
+                            transducer
+                            (line-seq reader)))])
       (catch Exception e
         (println "clj-file-processing.core/process-file error reading file:"
                  [file-path e])))))
