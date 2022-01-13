@@ -13,32 +13,57 @@ Assume that all names are identical or not?")
   ["mock_data_commas.csv" "mock_data_pipelines.csv" "mock_data_whitespace.csv"])
 
 (defn get-files-dir
-  "Builds files directory path based on user directory value."
+  "Builds files directory path based on user directory value.
+
+  Args:    none
+  Returns: files-dir (str)"
   []
   (let [user-dir (System/getProperty "user.dir")
         files-dir (str user-dir "/src/clj_file_processing/csv")]
     files-dir))
 
 (defn get-tree-seq
-  "Returns files sequence using Java File object."
-  []
-  (file-seq (io/file files-dir)))
+  "Returns files sequence using Java File object.
+
+  Args:    files-dir (str)
+  Returns: tree-seq (vector of string file paths)
+  "
+  [files-dir]
+  (let [tree-seq (file-seq (io/file files-dir))]
+    tree-seq))
 
 (defn get-files-to-process ;; rename?
-  "Returns and array of all file names (as strings) in a directory.
+  "Gets a sequence of all file names in a directory for future processing.
+  Assumes all files need to be processed.
+
+  Args:    none
+  Returns: files-to-parse (vector of strings)
+
   TODO: add example of usage?"
   []
   (let [files-dir (get-files-dir)
-        tree-seq (get-tree-seq)
+        tree-seq (get-tree-seq files-dir)
         files-to-parse (mapv str (filter #(.isFile %) tree-seq))]
     files-to-parse))
 
 (defn remove-header
+  "Removes an optional header from the raw content (if found).
+
+  Args:    raw-content (str), header-pattern (regex pattern)
+  Returns: headerless-content (str).
+  "
   [raw-content header-pattern]
   (let [headerless-content (str/replace-first raw-content header-pattern "")]))
 
 (defn parse-content
-  "Checks for header row. If found, removes it. Processes each line "
+  "Checks for header row. If at least one of the field labels is present (regex
+  is case insensitive), the header starting at the match and ending at the
+  newline, is removed. Remaining string is split by newline into vector of
+  vectors.Processes each line
+
+  Args:     raw-content (str)
+  Returns:  TODO
+  "
   [raw-content]
   (let [header-pattern
         (re-pattern ;; case insensitive
@@ -46,11 +71,21 @@ Assume that all names are identical or not?")
         header-match (re-find header-pattern raw-content)
         headerless-content (when (seq header-match) ;; when works too
                              (remove-header raw-content header-pattern))
-
+        delimiter nil ;; TODO
         parsed-entries (as-> (or headerless-content raw-content) arg
                          (str/split arg #"\n")
-                         (mapv vector arg))
-        ]))
+                         (mapv vector arg)
+                         (mapv #(-> % first (str/split delimiter)) arg))]))
+
+(defn remove-duplicates
+  "Removes duplicate entries.
+
+  Args:    all-records (atom storing lazy seq)
+  Returns: unique-records (set of vectors)
+  "
+  [all-records]
+  (let [unique-records (set @all-records)]
+    unique-records))
 
 (defn process-files
   "Processes files returned by get-files-to-process fn. Assumes all of the files
@@ -58,12 +93,17 @@ Assume that all names are identical or not?")
   properly closed when processing is complete.
   TODO - use csv fns maybe? or don't assume that all files will be in csv format?"
   []
-  (let [files-to-parse (get-files-to-process)]
+  (let [all-records (atom nil)
+        files-to-parse (get-files-to-process)]
     (try
-      (for [file-path files-to-parse
-            :let [raw-content (with-open [reader (io/reader file-path)]
-                                (str/join "\n" (line-seq reader)))
-                  content* (parse-content raw-content)]])
+      (do
+        (for [file-path files-to-parse
+              :let [raw-content (with-open [reader (io/reader file-path)]
+                                  (str/join "\n" (line-seq reader)))
+                    content* (parse-content raw-content)]]
+          (swap! all-records conj content*))
+        (let [_ (swap! all-records flatten)
+              unique-records (remove-duplicates all-records)]))
       (catch Exception e
         (println "clj-file-processing.core/process-file error reading file:"
                  [file-path e])))))
