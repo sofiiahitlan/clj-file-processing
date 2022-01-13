@@ -9,32 +9,66 @@
 new file is processed maybe? If no, figure out how to use transducer.
 Assume that all names are identical or not?")
 
-(def files-to-process ;; hard-code all file names vs access all files in folder?
+#_(def files-to-process ;; TODO - remove this, now the list is dynamic
   ["mock_data_commas.csv" "mock_data_pipelines.csv" "mock_data_whitespace.csv"])
 
-(defn get-files-to-process ;; rename?
-  "Returns and array of file names in a directory."
+(defn get-files-dir
+  "Builds files directory path based on user directory value."
   []
-  (mapv str (filter #(.isFile %) (file-seq (clojure.java.io/file "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/")))))
-
-(defn process-file
-  "Opens file using with-open to ensure the Reader is properly closed when
-  processing is completed."
-  [transducer file]
   (let [user-dir (System/getProperty "user.dir")
-        currernt-dir (str user-dir "/src/clj_file_processing/csv")
-        file-path (str user-dir "/" file)]
+        files-dir (str user-dir "/src/clj_file_processing/csv")]
+    files-dir))
+
+(defn get-tree-seq
+  "Returns files sequence using Java File object."
+  []
+  (file-seq (io/file files-dir)))
+
+(defn get-files-to-process ;; rename?
+  "Returns and array of all file names (as strings) in a directory.
+  TODO: add example of usage?"
+  []
+  (let [files-dir (get-files-dir)
+        tree-seq (get-tree-seq)
+        files-to-parse (mapv str (filter #(.isFile %) tree-seq))]
+    files-to-parse))
+
+(defn remove-header
+  [raw-content header-pattern]
+  (let [headerless-content (str/replace-first raw-content header-pattern "")]))
+
+(defn parse-content
+  "Checks for header row. If found, removes it. Processes each line "
+  [raw-content]
+  (let [header-pattern
+        (re-pattern ;; case insensitive
+         "(?i)(LastName|FirstName|Gender|FavoriteColor|DateOfBirth).*\\n")
+        header-match (re-find header-pattern raw-content)
+        headerless-content (when (seq header-match) ;; when works too
+                             (remove-header raw-content header-pattern))
+
+        parsed-entries (as-> (or headerless-content raw-content) arg
+                         (str/split arg #"\n")
+                         (mapv vector arg))
+        ]))
+
+(defn process-files
+  "Processes files returned by get-files-to-process fn. Assumes all of the files
+  need to be processed. Opens each using with-open to ensure the Reader is
+  properly closed when processing is complete.
+  TODO - use csv fns maybe? or don't assume that all files will be in csv format?"
+  []
+  (let [files-to-parse (get-files-to-process)]
     (try
-      (let [content (with-open [reader (io/reader file-path)]
-                      (str/join "\n" (line-seq reader))
-                      #_(into []
-                            transducer
-                            (line-seq reader)))])
+      (for [file-path files-to-parse
+            :let [raw-content (with-open [reader (io/reader file-path)]
+                                (str/join "\n" (line-seq reader)))
+                  content* (parse-content raw-content)]])
       (catch Exception e
         (println "clj-file-processing.core/process-file error reading file:"
                  [file-path e])))))
 
-(defn process-files
+#_(defn process-files ;; TODO remove
   [transducer files]
   (into
    []
@@ -60,23 +94,30 @@ Assume that all names are identical or not?")
   processed. TODO: trim output, split by new line, process each line one by one?
   Store as vector of vectors maybe."
   [& args]
-  (let [output (atom nil)])
-  (when (seq files-top-process)
-    (let [output (apply + (process-files (comp (map count))
-                                         files-to-process))
-          ])))
+  (let [output (atom nil)]
+    #_(when (seq files-to-process)
+      (let [output (apply + (process-files (comp (map count))
+                                           files-to-process))
+            ]))))
 
-
-
-;; (file-seq (clojure.java.io/file "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/"))
-
-;; (#object[java.io.File 0x58e52aa1 "/home/sofiia/clj-file-processing/src/clj_file_processing/csv"]
-;;  #object[java.io.File 0x6e8fe4dc "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_whitespace.csv"]
-;;  #object[java.io.File 0x73ad899c "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_pipelines.csv"]
-;;  #object[java.io.File 0x13986ece "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_commas.csv"])
 
 
 ;; (mapv str (filter #(.isFile %) (file-seq (clojure.java.io/file "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/"))))
 ;; ["/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_whitespace.csv"
 ;;  "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_pipelines.csv"
 ;;  "/home/sofiia/clj-file-processing/src/clj_file_processing/csv/mock_data_commas.csv"]
+
+
+(def test-data
+  "LastName, FirstName, Gender, FavoriteColor, DateOfBirth\nMort, Aeriela, Female, Orange, 5/14/2010\nCroll, Lenee, Male, Red, 8/18/1948\nBrosetti, Netta, Female, Crimson, 9/8/1931\nBickmore, Lindy, Male, Pink, 1/22/2021\nGenthner, Hetti, Male, Orange, 10/17/1999\nStelli, Hatti, Male, Mauv, 10/17/1969\nRichards, Mitch, Female, Red, 11/24/1941\nHalpeine, Greta, Agender, Fuscia, 6/26/1939\nOrrell, Renae, Female, Violet, 12/3/2018\nBtham, Zsazsa, Male, Crimson, 7/18/1987\nSeelbach, Liza, Male, Red, 9/27/1928\nUmpleby, Geordie, Female, Khaki, 10/16/1988\nBensley, Tate, Female, Turquoise, 6/27/1950\nTretwell, Lexie, Polygender, Orange, 5/13/1961\nMcArthur, Rafaellle, Female, Puce, 3/3/2016\nJobey, Doralynn, Male, Crimson, 1/19/1977\nCastellaccio, Teddie, Male, Teal, 11/7/2002\nLightbowne, Aubrie, Male, Teal, 1/31/1930\nBiaggetti, Thea, Female, Violet, 7/29/1976")
+
+
+
+#_(mapv vector ["Mort, Aeriela, Female, Orange, 5/14/2010"
+                "Croll, Lenee, Male, Red, 8/18/1948"
+                "Brosetti, Netta, Female, Crimson, 9/8/1931"
+                "Biaggetti, Thea, Female, Violet, 7/29/1976"])
+#_[["Mort, Aeriela, Female, Orange, 5/14/2010"]
+   ["Croll, Lenee, Male, Red, 8/18/1948"]
+   ["Brosetti, Netta, Female, Crimson, 9/8/1931"]
+   ["Biaggetti, Thea, Female, Violet, 7/29/1976"]]
