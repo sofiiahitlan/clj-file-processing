@@ -55,22 +55,49 @@ Assume that all names are identical or not?")
   [raw-content header-pattern]
   (let [headerless-content (str/replace-first raw-content header-pattern "")]))
 
-(defn sort-by-dob
-  "Sorts entries by birth date based on datetime objects values, ascending."
-  [parsed-entries]
-  (sort-by
-   (comp time/get-date-time time/str-to-seq-of-ints last)
-   parsed-entries))
+(defn get-criteria-fn
+  "Assumes that entries in vector are stored in the following order:
+  [lname fname gender color dob], i.e. ['Bloom' 'Justin' 'Male' 'Red' '8/18/1959']"
+  [criteria]
+  (case criteria
+    "lname"  first
+    "fname"  second
+    "gender" #(nth % 2)
+    "color"  #(nth % 3)
+    "dob"    #(comp time/get-date-time time/str-to-seq-of-ints last) ;; ?
+    nil))
 
-(defn sort-by-last-name
-  "Sorts entries by last name, descending (by default), unless optional order
-  arg is provided. In this case, checks order value. Options: 'asc', 'desc'."
-  [parsed-entries & [order]]
-  (let [order* (or order "desc")
-        sorted-asc (sort-by (comp first) parsed-entries)]
-    (if (= order* "desc")
-      (reverse sorted-asc)
-      sorted-asc)))
+(defn sort-by-one-criteria
+  "Sorts entries by one criteria passed as string:
+  * fname
+  * lname
+  * dob - converts string date to datetime object before sorting
+  * gender - female or male.
+  Sorts in ascending order by default if order isn't provided. Options:
+  'asc', 'desc'."
+  [criteria parsed-entries & [order]]
+  (let [criteria-fn (get-criteria-fn criteria)])
+  (when (and criteria-fn (seq parsed-entries))
+    (let [sort-asc (fn [criteria-fn parsed-entries]
+                     (sort-by criteria-fn parsed-entries))
+          sort-desc (fn [criteria-fn parsed-entries]
+                      (->> parsed-entries (sort-asc criteria-fn) reverse))
+          order* (if order (-> order str str/trim str/lower-case) "asc")]
+      (case order*
+        "asc" (sort-asc criteria-fn parsed-entries)
+        "desc" (sort-desc criteria-fn parsed-entries)
+        nil))))
+
+(defn sort-by-multiple-criteria ;; TODO
+  [first-criteria second-criteria]
+  )
+
+(defn sort-by-gender-and-lname-asc
+  "Sorts entries by gender (females before males) then by last name ascending."
+  [parsed-entries]
+  (sort-by (juxt (get-criteria-fn "gender") (get-criteria-fn "lname"))
+           parsed-entries))
+
 
 (defn parse-content
   "Checks for header row. If at least one of the field labels is present (regex
